@@ -16,7 +16,17 @@ const app = express();
 app.use(cors());
 app.use(express.json());
 
-// 🔥 Health Check Route
+
+// 🔥 Root Route (Professional Touch)
+app.get('/', (req, res) => {
+  res.json({
+    message: 'Home Renovation Tracker API is running',
+    version: '1.0.0'
+  });
+});
+
+
+// 🔥 Health Check
 app.get('/health', async (req, res) => {
   try {
     const { error } = await supabase
@@ -46,23 +56,25 @@ app.get('/health', async (req, res) => {
   }
 });
 
-// Routes
+
+// API Routes
 app.use('/api/projects', projectRoutes);
 app.use('/api/tasks', taskRoutes);
 app.use('/api/expenses', expenseRoutes);
 app.use('/api/photos', photoRoutes);
 
-// Global Error Handler (fallback)
+
+// Global Error Handler
 app.use((err, req, res, next) => {
   console.error(err);
-
   res.status(500).json({
     success: false,
     message: 'Internal Server Error'
   });
 });
 
-const PORT = process.env.PORT || 7000;
+
+const PORT = process.env.PORT || 9000;
 
 app.listen(PORT, () => {
   console.log(`🚀 Server running on port ${PORT}`);
