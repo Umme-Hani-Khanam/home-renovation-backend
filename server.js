@@ -1,7 +1,9 @@
+import dashboardRoutes from "./routes/dashboard.js";
 import express from "express";
 import cors from "cors";
 import dotenv from "dotenv";
 import supabase from "./config/supabase.js";
+import contractorRoutes from "./routes/contractors.js";
 
 import authRoutes from "./routes/auth.js";
 import projectRoutes from "./routes/projects.js";
@@ -47,7 +49,8 @@ app.use("/api/projects", projectRoutes);
 app.use("/api/tasks", taskRoutes);
 app.use("/api/expenses", expenseRoutes);
 app.use("/api/photos", photoRoutes);
-
+app.use("/api/contractors", contractorRoutes);
+app.use("/api/dashboard", dashboardRoutes);
 const PORT = process.env.PORT || 5000;
 
 app.listen(PORT, () => {

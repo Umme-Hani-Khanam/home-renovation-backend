@@ -6,14 +6,14 @@ const router = express.Router();
 router.use(authenticateUser);
 
 /**
- * GET TASKS BY PROJECT
+ * GET Contractors by Project
  */
 router.get("/:projectId", async (req, res) => {
   try {
     const { projectId } = req.params;
 
     const { data, error } = await supabase
-      .from("tasks")
+      .from("contractors")
       .select("*")
       .eq("project_id", projectId)
       .order("created_at", { ascending: false });
@@ -27,28 +27,36 @@ router.get("/:projectId", async (req, res) => {
 });
 
 /**
- * CREATE TASK
+ * CREATE Contractor
  */
 router.post("/", async (req, res) => {
   try {
-    const { project_id, title, description, priority, deadline } = req.body;
+    const {
+      project_id,
+      name,
+      phone,
+      email,
+      role,
+      contract_amount,
+    } = req.body;
 
-    if (!project_id || !title) {
+    if (!project_id || !name) {
       return res.status(400).json({
         success: false,
-        message: "Project ID and title required",
+        message: "Project ID and contractor name required",
       });
     }
 
     const { data, error } = await supabase
-      .from("tasks")
+      .from("contractors")
       .insert([
         {
           project_id,
-          title,
-          description,
-          priority,
-          deadline,
+          name,
+          phone,
+          email,
+          role,
+          contract_amount,
         },
       ])
       .select();
@@ -62,42 +70,20 @@ router.post("/", async (req, res) => {
 });
 
 /**
- * UPDATE TASK STATUS
- */
-router.patch("/:id", async (req, res) => {
-  try {
-    const { id } = req.params;
-    const { status } = req.body;
-
-    const { data, error } = await supabase
-      .from("tasks")
-      .update({ status })
-      .eq("id", id)
-      .select();
-
-    if (error) throw error;
-
-    res.json({ success: true, data });
-  } catch (error) {
-    res.status(500).json({ success: false, message: error.message });
-  }
-});
-
-/**
- * DELETE TASK
+ * DELETE Contractor
  */
 router.delete("/:id", async (req, res) => {
   try {
     const { id } = req.params;
 
     const { error } = await supabase
-      .from("tasks")
+      .from("contractors")
       .delete()
       .eq("id", id);
 
     if (error) throw error;
 
-    res.json({ success: true, message: "Task deleted" });
+    res.json({ success: true, message: "Contractor removed" });
   } catch (error) {
     res.status(500).json({ success: false, message: error.message });
   }
