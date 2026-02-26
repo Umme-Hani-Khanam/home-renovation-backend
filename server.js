@@ -1,3 +1,4 @@
+import materialsRoutes from "./routes/materials.js";
 import dashboardRoutes from "./routes/dashboard.js";
 import express from "express";
 import cors from "cors";
@@ -43,7 +44,7 @@ app.get("/health", async (req, res) => {
     database: "connected"
   });
 });
-
+app.use("/api/materials", materialsRoutes);
 app.use("/api/auth", authRoutes);
 app.use("/api/projects", projectRoutes);
 app.use("/api/tasks", taskRoutes);
