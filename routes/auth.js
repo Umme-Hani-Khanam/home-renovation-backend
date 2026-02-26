@@ -3,10 +3,17 @@ import supabase from "../config/supabase.js";
 
 const router = express.Router();
 
-// Signup
+// SIGNUP
 router.post("/signup", async (req, res) => {
   try {
     const { email, password } = req.body;
+
+    if (!email || !password) {
+      return res.status(400).json({
+        success: false,
+        message: "Email and password required"
+      });
+    }
 
     const { error } = await supabase.auth.signUp({
       email,
@@ -33,7 +40,7 @@ router.post("/signup", async (req, res) => {
   }
 });
 
-// Login
+// LOGIN
 router.post("/login", async (req, res) => {
   try {
     const { email, password } = req.body;
