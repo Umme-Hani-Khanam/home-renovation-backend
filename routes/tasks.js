@@ -5,38 +5,24 @@ import { authenticateUser } from "../middleware/auth.js";
 const router = express.Router();
 router.use(authenticateUser);
 
-/**
- * GET TASKS BY PROJECT
- */
-router.get("/:projectId", async (req, res) => {
-  try {
-    const { projectId } = req.params;
-
-    const { data, error } = await supabase
-      .from("tasks")
-      .select("*")
-      .eq("project_id", projectId)
-      .order("created_at", { ascending: false });
-
-    if (error) throw error;
-
-    res.json({ success: true, data });
-  } catch (error) {
-    res.status(500).json({ success: false, message: error.message });
-  }
-});
-
-/**
- * CREATE TASK
- */
+/* ================================
+   CREATE TASK
+================================= */
 router.post("/", async (req, res) => {
   try {
-    const { project_id, title, description, priority, deadline } = req.body;
+    const {
+      title,
+      description,
+      priority,
+      deadline,
+      project_id,
+      reminder_at,
+    } = req.body;
 
-    if (!project_id || !title) {
+    if (!title || !project_id) {
       return res.status(400).json({
         success: false,
-        message: "Project ID and title required",
+        message: "Task title and project required",
       });
     }
 
@@ -44,11 +30,13 @@ router.post("/", async (req, res) => {
       .from("tasks")
       .insert([
         {
-          project_id,
           title,
           description,
           priority,
           deadline,
+          project_id,
+          reminder_at,
+          reminder_sent: false,
         },
       ])
       .select();
@@ -57,13 +45,37 @@ router.post("/", async (req, res) => {
 
     res.status(201).json({ success: true, data });
   } catch (error) {
-    res.status(500).json({ success: false, message: error.message });
+    res.status(500).json({
+      success: false,
+      message: error.message,
+    });
   }
 });
 
-/**
- * UPDATE TASK STATUS
- */
+/* ================================
+   GET TASKS BY PROJECT
+================================= */
+router.get("/:projectId", async (req, res) => {
+  const { projectId } = req.params;
+  const { assigned_to } = req.query;
+
+  let query = supabase
+    .from("tasks")
+    .select("*")
+    .eq("project_id", projectId);
+
+  if (assigned_to) {
+    query = query.eq("assigned_to", assigned_to);
+  }
+
+  const { data } = await query;
+
+  res.json({ success: true, data });
+});
+
+/* ================================
+   UPDATE TASK STATUS
+================================= */
 router.patch("/:id", async (req, res) => {
   try {
     const { id } = req.params;
@@ -79,27 +91,57 @@ router.patch("/:id", async (req, res) => {
 
     res.json({ success: true, data });
   } catch (error) {
-    res.status(500).json({ success: false, message: error.message });
+    res.status(500).json({
+      success: false,
+      message: error.message,
+    });
   }
 });
 
-/**
- * DELETE TASK
- */
-router.delete("/:id", async (req, res) => {
+/* ================================
+   GET UPCOMING REMINDERS
+================================= */
+router.get("/reminders/upcoming", async (req, res) => {
+  try {
+    const now = new Date().toISOString();
+
+    const { data, error } = await supabase
+      .from("tasks")
+      .select("*")
+      .lte("reminder_at", now)
+      .eq("reminder_sent", false);
+
+    if (error) throw error;
+
+    res.json({ success: true, data });
+  } catch (error) {
+    res.status(500).json({
+      success: false,
+      message: error.message,
+    });
+  }
+});
+
+/* ================================
+   MARK REMINDER AS SENT
+================================= */
+router.patch("/:id/reminder-sent", async (req, res) => {
   try {
     const { id } = req.params;
 
     const { error } = await supabase
       .from("tasks")
-      .delete()
+      .update({ reminder_sent: true })
       .eq("id", id);
 
     if (error) throw error;
 
-    res.json({ success: true, message: "Task deleted" });
+    res.json({ success: true });
   } catch (error) {
-    res.status(500).json({ success: false, message: error.message });
+    res.status(500).json({
+      success: false,
+      message: error.message,
+    });
   }
 });
 

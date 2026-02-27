@@ -107,7 +107,67 @@ router.patch("/:id/status", async (req, res) => {
     res.status(500).json({ success: false, message: error.message });
   }
 });
+router.get("/:id/progress-estimation", async (req, res) => {
+  try {
+    const { id } = req.params;
 
+    const { data: tasks, error } = await supabase
+      .from("tasks")
+      .select("deadline,status")
+      .eq("project_id", id);
+
+    if (error) throw error;
+
+    const total = tasks.length;
+    const completed = tasks.filter(t => t.status === "completed").length;
+
+    const estimatedCompletion =
+      total > 0 ? Math.round((completed / total) * 100) : 0;
+
+    res.json({
+      success: true,
+      data: {
+        totalTasks: total,
+        completedTasks: completed,
+        estimatedCompletion,
+      },
+    });
+  } catch (error) {
+    res.status(500).json({ success: false, message: error.message });
+  }
+});
+router.get("/:id/report", async (req, res) => {
+  try {
+    const { id } = req.params;
+
+    const { data: project } = await supabase
+      .from("projects")
+      .select("*")
+      .eq("id", id)
+      .single();
+
+    const { data: expenses } = await supabase
+      .from("expenses")
+      .select("*")
+      .eq("project_id", id);
+
+    const { data: tasks } = await supabase
+      .from("tasks")
+      .select("*")
+      .eq("project_id", id);
+
+    res.json({
+      success: true,
+      data: {
+        project,
+        expenses,
+        tasks,
+      },
+    });
+  } catch (error) {
+    res.status(500).json({ success: false, message: error.message });
+  }
+});
 /**
  * PROJECT ANALYTICS
  */

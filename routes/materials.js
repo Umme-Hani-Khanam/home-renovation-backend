@@ -5,114 +5,48 @@ import { authenticateUser } from "../middleware/auth.js";
 const router = express.Router();
 router.use(authenticateUser);
 
-/**
- * GET Materials by Project
- */
-router.get("/:projectId", async (req, res) => {
+/* AUTO GENERATE MATERIALS */
+router.post("/auto/:projectId", async (req, res) => {
   try {
     const { projectId } = req.params;
 
-    const { data, error } = await supabase
-      .from("materials")
+    const { data: project } = await supabase
+      .from("projects")
       .select("*")
-      .eq("project_id", projectId)
-      .order("created_at", { ascending: false });
+      .eq("id", projectId)
+      .single();
 
-    if (error) throw error;
+    const materials = [];
 
-    res.json({ success: true, data });
-  } catch (error) {
-    res.status(500).json({ success: false, message: error.message });
-  }
-});
+    const name = project.name.toLowerCase();
 
-/**
- * CREATE Material
- */
-router.post("/", async (req, res) => {
-  try {
-    const {
-      project_id,
-      name,
-      quantity,
-      unit,
-      estimated_cost,
-    } = req.body;
-
-    if (!project_id || !name) {
-      return res.status(400).json({
-        success: false,
-        message: "Project ID and material name required",
-      });
+    if (name.includes("kitchen")) {
+      materials.push(
+        { name: "Cabinets", estimated_cost: 40000 },
+        { name: "Granite Countertop", estimated_cost: 25000 },
+        { name: "Tiles", estimated_cost: 15000 }
+      );
     }
 
-    const { data, error } = await supabase
-      .from("materials")
-      .insert([
-        {
-          project_id,
-          name,
-          quantity,
-          unit,
-          estimated_cost,
-        },
-      ])
-      .select();
+    if (name.includes("bathroom")) {
+      materials.push(
+        { name: "Shower Set", estimated_cost: 12000 },
+        { name: "Waterproof Paint", estimated_cost: 8000 }
+      );
+    }
 
-    if (error) throw error;
+    const formatted = materials.map(m => ({
+      ...m,
+      project_id: projectId,
+    }));
 
-    res.status(201).json({ success: true, data });
+    if (formatted.length > 0) {
+      await supabase.from("materials").insert(formatted);
+    }
+
+    res.json({ success: true, data: formatted });
   } catch (error) {
-    res.status(500).json({ success: false, message: error.message });
-  }
-});
-
-/**
- * UPDATE Material (mark purchased or edit cost)
- */
-router.patch("/:id", async (req, res) => {
-  try {
-    const { id } = req.params;
-    const { purchased, quantity, estimated_cost } = req.body;
-
-    const updateFields = {};
-
-    if (purchased !== undefined) updateFields.purchased = purchased;
-    if (quantity !== undefined) updateFields.quantity = quantity;
-    if (estimated_cost !== undefined)
-      updateFields.estimated_cost = estimated_cost;
-
-    const { data, error } = await supabase
-      .from("materials")
-      .update(updateFields)
-      .eq("id", id)
-      .select();
-
-    if (error) throw error;
-
-    res.json({ success: true, data });
-  } catch (error) {
-    res.status(500).json({ success: false, message: error.message });
-  }
-});
-
-/**
- * DELETE Material
- */
-router.delete("/:id", async (req, res) => {
-  try {
-    const { id } = req.params;
-
-    const { error } = await supabase
-      .from("materials")
-      .delete()
-      .eq("id", id);
-
-    if (error) throw error;
-
-    res.json({ success: true, message: "Material removed" });
-  } catch (error) {
-    res.status(500).json({ success: false, message: error.message });
+    res.status(500).json({ success: false });
   }
 });
 

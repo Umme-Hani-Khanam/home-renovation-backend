@@ -1,119 +1,75 @@
-import express from 'express';
-import supabase from '../config/supabase.js';
-import { authenticateUser } from '../middleware/auth.js';
+import express from "express";
+import supabase from "../config/supabase.js";
+import { authenticateUser } from "../middleware/auth.js";
 
 const router = express.Router();
-
-// Protect all routes
 router.use(authenticateUser);
 
-
-// ✅ Add Photo (URL based for now)
-router.post('/', async (req, res) => {
+/* UPLOAD PHOTO */
+router.post("/", async (req, res) => {
   try {
-    const { project_id, image_url, description } = req.body;
+    const { project_id, image_base64, file_name } = req.body;
 
-    if (!project_id || !image_url) {
+    if (!project_id || !image_base64) {
       return res.status(400).json({
         success: false,
-        message: 'Project ID and Image URL are required'
+        message: "Project and image required",
       });
     }
 
+    const buffer = Buffer.from(
+      image_base64.replace(/^data:image\/\w+;base64,/, ""),
+      "base64"
+    );
+
+    const filePath = `${project_id}/${Date.now()}-${file_name}`;
+
+    const { error: uploadError } = await supabase.storage
+      .from("project-photos")
+      .upload(filePath, buffer, {
+        contentType: "image/png",
+      });
+
+    if (uploadError) throw uploadError;
+
+    const { data: publicUrlData } = supabase.storage
+      .from("project-photos")
+      .getPublicUrl(filePath);
+
     const { data, error } = await supabase
-      .from('photos')
+      .from("project_photos")
       .insert([
         {
           project_id,
-          image_url,
-          description
-        }
+          image_url: publicUrlData.publicUrl,
+        },
       ])
-      .select()
-      .single();
+      .select();
 
-    if (error) {
-      return res.status(400).json({
-        success: false,
-        message: error.message
-      });
-    }
+    if (error) throw error;
 
-    return res.status(201).json({
-      success: true,
-      data
-    });
-
-  } catch (err) {
-    return res.status(500).json({
-      success: false,
-      message: err.message
-    });
+    res.status(201).json({ success: true, data });
+  } catch (error) {
+    res.status(500).json({ success: false, message: error.message });
   }
 });
 
-
-// ✅ Get Photos for a Project
-router.get('/:project_id', async (req, res) => {
+/* GET PHOTOS */
+router.get("/:projectId", async (req, res) => {
   try {
-    const { project_id } = req.params;
+    const { projectId } = req.params;
 
     const { data, error } = await supabase
-      .from('photos')
-      .select('*')
-      .eq('project_id', project_id)
-      .order('created_at', { ascending: false });
+      .from("project_photos")
+      .select("*")
+      .eq("project_id", projectId);
 
-    if (error) {
-      return res.status(400).json({
-        success: false,
-        message: error.message
-      });
-    }
+    if (error) throw error;
 
-    return res.json({
-      success: true,
-      data
-    });
-
-  } catch (err) {
-    return res.status(500).json({
-      success: false,
-      message: err.message
-    });
+    res.json({ success: true, data });
+  } catch (error) {
+    res.status(500).json({ success: false, message: error.message });
   }
 });
-
-
-// ✅ Delete Photo
-router.delete('/:photo_id', async (req, res) => {
-  try {
-    const { photo_id } = req.params;
-
-    const { error } = await supabase
-      .from('photos')
-      .delete()
-      .eq('id', photo_id);
-
-    if (error) {
-      return res.status(400).json({
-        success: false,
-        message: error.message
-      });
-    }
-
-    return res.json({
-      success: true,
-      message: 'Photo deleted successfully'
-    });
-
-  } catch (err) {
-    return res.status(500).json({
-      success: false,
-      message: err.message
-    });
-  }
-});
-
 
 export default router;

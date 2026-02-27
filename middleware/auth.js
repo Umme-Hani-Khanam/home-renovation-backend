@@ -1,34 +1,37 @@
 import supabase from "../config/supabase.js";
 
 export const authenticateUser = async (req, res, next) => {
-  try {
-    const authHeader = req.headers.authorization;
+  const token = req.headers.authorization?.split(" ")[1];
 
-    if (!authHeader) {
-      return res.status(401).json({
-        success: false,
-        message: "Authorization header missing"
-      });
-    }
+  if (!token) {
+    return res.status(401).json({ success: false });
+  }
 
-    const token = authHeader.split(" ")[1];
+  const { data, error } = await supabase.auth.getUser(token);
 
-    const { data, error } = await supabase.auth.getUser(token);
+  if (error || !data.user) {
+    return res.status(401).json({ success: false });
+  }
 
-    if (error || !data.user) {
-      return res.status(401).json({
-        success: false,
-        message: "Invalid or expired token"
-      });
-    }
+  req.user = data.user;
+  next();
+};
 
-    req.user = data.user;
+export const authorizeProjectMember = async (req, res, next) => {
+  const projectId = req.params.projectId || req.body.project_id;
 
-    next();
-  } catch (err) {
-    return res.status(500).json({
+  const { data } = await supabase
+    .from("project_members")
+    .select("*")
+    .eq("project_id", projectId)
+    .eq("user_id", req.user.id);
+
+  if (!data || data.length === 0) {
+    return res.status(403).json({
       success: false,
-      message: err.message
+      message: "Access denied",
     });
   }
+
+  next();
 };
