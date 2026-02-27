@@ -22,7 +22,7 @@ router.post("/", async (req, res) => {
     }
 
     const model = genAI.getGenerativeModel({
-      model: "gemini-1.5-flash"
+      model: "gemini-1.5-flash-latest",
     });
 
     const prompt = `
@@ -32,12 +32,12 @@ Project: ${project_name}
 Description: ${description || "General renovation"}
 Budget: ₹${budget || "Not specified"}
 
-Give:
+Provide:
 - 5 renovation design ideas
 - 5 recommended materials
 - 3 practical DIY tips
 
-Keep it realistic and budget-aware.
+Keep suggestions realistic and budget-aware.
 `;
 
     const result = await model.generateContent(prompt);
