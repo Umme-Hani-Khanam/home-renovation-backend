@@ -22,22 +22,22 @@ router.post("/", async (req, res) => {
     }
 
     const model = genAI.getGenerativeModel({
-      model: "gemini-1.5-flash-latest",
+      model: "gemini-2.5-flash", // recommended free-tier model
     });
 
     const prompt = `
 You are a professional renovation consultant.
 
 Project: ${project_name}
-Description: ${description || "General renovation"}
+Description: ${description || "General renovation guidance"}
 Budget: ₹${budget || "Not specified"}
 
 Provide:
-- 5 renovation design ideas
-- 5 recommended materials
-- 3 practical DIY tips
+• 5 renovation design ideas
+• 5 recommended materials
+• 3 actionable DIY tips
 
-Keep suggestions realistic and budget-aware.
+Be clear and budget-aware.
 `;
 
     const result = await model.generateContent(prompt);
@@ -47,7 +47,6 @@ Keep suggestions realistic and budget-aware.
       success: true,
       data: text,
     });
-
   } catch (error) {
     console.error("Gemini Error:", error);
 
