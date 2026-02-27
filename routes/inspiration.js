@@ -1,6 +1,9 @@
 import express from "express";
 import { GoogleGenerativeAI } from "@google/generative-ai";
+import dotenv from "dotenv";
 import { authenticateUser } from "../middleware/auth.js";
+
+dotenv.config();
 
 const router = express.Router();
 router.use(authenticateUser);
@@ -11,35 +14,46 @@ router.post("/", async (req, res) => {
   try {
     const { project_name, description, budget } = req.body;
 
-    const model = genAI.getGenerativeModel({ model: "gemini-pro" });
+    if (!project_name) {
+      return res.status(400).json({
+        success: false,
+        message: "Project name required",
+      });
+    }
+
+    const model = genAI.getGenerativeModel({
+      model: "gemini-1.5-flash"
+    });
 
     const prompt = `
 You are a professional renovation consultant.
 
-Project Name: ${project_name}
-Description: ${description}
-Budget: ₹${budget}
+Project: ${project_name}
+Description: ${description || "General renovation"}
+Budget: ₹${budget || "Not specified"}
 
 Give:
-- 5 creative renovation design ideas
+- 5 renovation design ideas
 - 5 recommended materials
 - 3 practical DIY tips
 
-Keep it practical and realistic.
+Keep it realistic and budget-aware.
 `;
 
     const result = await model.generateContent(prompt);
-    const response = await result.response;
-    const text = response.text();
+    const text = result.response.text();
 
     res.json({
       success: true,
       data: text,
     });
+
   } catch (error) {
+    console.error("Gemini Error:", error);
+
     res.status(500).json({
       success: false,
-      message: "AI recommendation failed",
+      message: error.message,
     });
   }
 });
