@@ -89,9 +89,6 @@ async function withAssignedMember(projectId, tasks) {
   });
 }
 
-/* ================================
-   GET UPCOMING REMINDERS
-================================= */
 router.get("/reminders/upcoming", async (req, res) => {
   try {
     const now = new Date().toISOString();
@@ -99,7 +96,8 @@ router.get("/reminders/upcoming", async (req, res) => {
     const { data, error } = await supabase
       .from("tasks")
       .select("*")
-      .lte("reminder_at", now)
+      .not("reminder_at", "is", null)
+      .gte("reminder_at", now)
       .eq("reminder_sent", false)
       .order("reminder_at", { ascending: true });
 
@@ -114,9 +112,6 @@ router.get("/reminders/upcoming", async (req, res) => {
   }
 });
 
-/* ================================
-   CREATE TASK
-================================= */
 router.post("/", async (req, res) => {
   try {
     const {
@@ -183,9 +178,6 @@ router.post("/", async (req, res) => {
   }
 });
 
-/* ================================
-   GET TASKS BY PROJECT
-================================= */
 router.get("/:projectId", async (req, res) => {
   try {
     const { projectId } = req.params;
@@ -216,9 +208,6 @@ router.get("/:projectId", async (req, res) => {
   }
 });
 
-/* ================================
-   UPDATE TASK
-================================= */
 router.patch("/:id", async (req, res) => {
   try {
     const { id } = req.params;
@@ -308,9 +297,6 @@ router.patch("/:id", async (req, res) => {
   }
 });
 
-/* ================================
-   MARK REMINDER AS SENT
-================================= */
 router.patch("/:id/reminder-sent", async (req, res) => {
   try {
     const { id } = req.params;
@@ -332,3 +318,4 @@ router.patch("/:id/reminder-sent", async (req, res) => {
 });
 
 export default router;
+

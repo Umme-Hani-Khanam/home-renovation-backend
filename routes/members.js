@@ -35,7 +35,7 @@ router.post("/invite", async (req, res) => {
 
     if (error) throw error;
 
-    res.json({ success: true, data });
+    res.json({ success: true, data: Array.isArray(data) ? data : [] });
   } catch (error) {
     res.status(500).json({ success: false, message: error.message });
   }
@@ -45,17 +45,38 @@ router.get("/:projectId", async (req, res) => {
   try {
     const { projectId } = req.params;
 
-    const { data, error } = await supabase
+    const { data: members, error: membersError } = await supabase
       .from("project_members")
-      .select(
-        "id, project_id, user_id, invite_email, role, status, invited_at, accepted_at, profiles:user_id(id, full_name, email, avatar_url)"
-      )
+      .select("id, project_id, user_id, invite_email, role, status, invited_at, accepted_at")
       .eq("project_id", projectId)
       .order("invited_at", { ascending: false });
 
-    if (error) throw error;
+    if (membersError) throw membersError;
 
-    res.json({ success: true, data: Array.isArray(data) ? data : [] });
+    const safeMembers = Array.isArray(members) ? members : [];
+    const userIds = [...new Set(safeMembers.map((member) => member.user_id).filter(Boolean))];
+
+    let profileMap = new Map();
+
+    if (userIds.length > 0) {
+      const { data: profiles, error: profilesError } = await supabase
+        .from("profiles")
+        .select("id, full_name, email, avatar_url")
+        .in("id", userIds);
+
+      if (profilesError && profilesError.code !== "PGRST205") {
+        throw profilesError;
+      }
+
+      profileMap = new Map((profiles || []).map((profile) => [profile.id, profile]));
+    }
+
+    const enriched = safeMembers.map((member) => ({
+      ...member,
+      profile: member.user_id ? profileMap.get(member.user_id) || null : null,
+    }));
+
+    res.json({ success: true, data: enriched });
   } catch (error) {
     res.status(500).json({ success: false, message: error.message });
   }

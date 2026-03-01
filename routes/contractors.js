@@ -5,7 +5,28 @@ import { authenticateUser } from "../middleware/auth.js";
 const router = express.Router();
 router.use(authenticateUser);
 
-/* ADD CONTRACTOR */
+router.get("/", async (req, res) => {
+  try {
+    const { projectId } = req.query;
+
+    let query = supabase
+      .from("contractors")
+      .select("id, name, phone, email, role, project_id, created_at")
+      .order("created_at", { ascending: false });
+
+    if (projectId) {
+      query = query.eq("project_id", projectId);
+    }
+
+    const { data, error } = await query;
+    if (error) throw error;
+
+    res.json({ success: true, data: Array.isArray(data) ? data : [] });
+  } catch (error) {
+    res.status(500).json({ success: false, message: error.message });
+  }
+});
+
 router.post("/", async (req, res) => {
   try {
     const { name, phone, email, role, project_id } = req.body;
@@ -17,13 +38,12 @@ router.post("/", async (req, res) => {
 
     if (error) throw error;
 
-    res.status(201).json({ success: true, data });
+    res.status(201).json({ success: true, data: Array.isArray(data) ? data : [] });
   } catch (error) {
     res.status(500).json({ success: false, message: error.message });
   }
 });
 
-/* SCHEDULE APPOINTMENT */
 router.post("/schedule", async (req, res) => {
   try {
     const { contractor_id, scheduled_date, note } = req.body;
@@ -35,7 +55,7 @@ router.post("/schedule", async (req, res) => {
 
     if (error) throw error;
 
-    res.status(201).json({ success: true, data });
+    res.status(201).json({ success: true, data: Array.isArray(data) ? data : [] });
   } catch (error) {
     res.status(500).json({ success: false, message: error.message });
   }
