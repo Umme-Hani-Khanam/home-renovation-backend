@@ -17,17 +17,20 @@ router.post("/", async (req, res) => {
       });
     }
 
-    const buffer = Buffer.from(
-      image_base64.replace(/^data:image\/\w+;base64,/, ""),
-      "base64"
+    const base64Payload = String(image_base64).replace(
+      /^data:image\/\w+;base64,/,
+      ""
     );
 
-    const filePath = `${project_id}/${Date.now()}-${file_name}`;
+    const buffer = Buffer.from(base64Payload, "base64");
+    const safeFileName = file_name || "photo.png";
+    const filePath = `${project_id}/${Date.now()}-${safeFileName}`;
 
     const { error: uploadError } = await supabase.storage
       .from("project-photos")
       .upload(filePath, buffer, {
         contentType: "image/png",
+        upsert: false,
       });
 
     if (uploadError) throw uploadError;
@@ -36,12 +39,19 @@ router.post("/", async (req, res) => {
       .from("project-photos")
       .getPublicUrl(filePath);
 
+    let imageUrl = publicUrlData?.publicUrl || "";
+
+    if (imageUrl && !imageUrl.startsWith("http")) {
+      const baseUrl = process.env.SUPABASE_URL || "";
+      imageUrl = `${baseUrl}/storage/v1/object/public/project-photos/${filePath}`;
+    }
+
     const { data, error } = await supabase
       .from("project_photos")
       .insert([
         {
           project_id,
-          image_url: publicUrlData.publicUrl,
+          image_url: imageUrl,
         },
       ])
       .select();
