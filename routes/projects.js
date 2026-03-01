@@ -5,6 +5,10 @@ import { authenticateUser } from "../middleware/auth.js";
 const router = express.Router();
 router.use(authenticateUser);
 
+function safeNumber(value) {
+  return Number(value || 0);
+}
+
 /**
  * CREATE PROJECT
  */
@@ -107,35 +111,61 @@ router.patch("/:id/status", async (req, res) => {
     res.status(500).json({ success: false, message: error.message });
   }
 });
+
 router.get("/:id/progress-estimation", async (req, res) => {
   try {
     const { id } = req.params;
 
     const { data: tasks, error } = await supabase
       .from("tasks")
-      .select("deadline,status")
+      .select("id, deadline, status, created_at")
       .eq("project_id", id);
 
     if (error) throw error;
 
-    const total = tasks.length;
-    const completed = tasks.filter(t => t.status === "completed").length;
+    const safeTasks = Array.isArray(tasks) ? tasks : [];
+    const total = safeTasks.length;
+    const completed = safeTasks.filter((task) => task.status === "completed").length;
 
-    const estimatedCompletion =
-      total > 0 ? Math.round((completed / total) * 100) : 0;
+    const completionPercentage = total > 0 ? Math.round((completed / total) * 100) : 0;
+    const taskCompletionRatio = `${completed}/${total}`;
+
+    const pendingDeadlines = safeTasks
+      .filter((task) => task.status !== "completed" && task.deadline)
+      .map((task) => new Date(task.deadline).getTime())
+      .filter((value) => !Number.isNaN(value));
+
+    const now = Date.now();
+    let estimatedCompletionDate = null;
+
+    if (pendingDeadlines.length > 0) {
+      estimatedCompletionDate = new Date(Math.max(...pendingDeadlines)).toISOString();
+    } else if (total > 0 && completed === total) {
+      estimatedCompletionDate = new Date(now).toISOString();
+    } else if (total > 0 && completed > 0) {
+      const elapsedDays = Math.max(1, Math.round((now - new Date(safeTasks[0].created_at || now).getTime()) / 86400000));
+      const pace = completed / elapsedDays;
+      const remainingTasks = total - completed;
+      const remainingDays = pace > 0 ? Math.ceil(remainingTasks / pace) : 0;
+      estimatedCompletionDate = new Date(now + remainingDays * 86400000).toISOString();
+    }
 
     res.json({
       success: true,
       data: {
         totalTasks: total,
         completedTasks: completed,
-        estimatedCompletion,
+        estimatedCompletion: completionPercentage,
+        completionPercentage,
+        taskCompletionRatio,
+        estimatedCompletionDate,
       },
     });
   } catch (error) {
     res.status(500).json({ success: false, message: error.message });
   }
 });
+
 router.get("/:id/report", async (req, res) => {
   try {
     const { id } = req.params;
@@ -160,14 +190,15 @@ router.get("/:id/report", async (req, res) => {
       success: true,
       data: {
         project,
-        expenses,
-        tasks,
+        expenses: Array.isArray(expenses) ? expenses : [],
+        tasks: Array.isArray(tasks) ? tasks : [],
       },
     });
   } catch (error) {
     res.status(500).json({ success: false, message: error.message });
   }
 });
+
 /**
  * PROJECT ANALYTICS
  */
@@ -175,38 +206,28 @@ router.get("/:id/analytics", async (req, res) => {
   try {
     const { id } = req.params;
 
-    // 1️⃣ Get Project
     const { data: project, error: projectError } = await supabase
       .from("projects")
-      .select("*")
+      .select("id, total_budget")
       .eq("id", id)
       .single();
 
     if (projectError) throw projectError;
 
-    const totalBudget = Number(project.total_budget || 0);
+    const totalBudget = safeNumber(project?.total_budget);
 
-    // 2️⃣ Get Expenses
     const { data: expenses, error: expenseError } = await supabase
       .from("expenses")
-      .select("amount")
+      .select("amount, category")
       .eq("project_id", id);
 
     if (expenseError) throw expenseError;
 
-    const totalSpent = expenses.reduce(
-      (sum, e) => sum + Number(e.amount || 0),
-      0
-    );
-
+    const safeExpenses = Array.isArray(expenses) ? expenses : [];
+    const totalSpent = safeExpenses.reduce((sum, item) => sum + safeNumber(item.amount), 0);
     const remainingBudget = totalBudget - totalSpent;
+    const budgetUsedPercentage = totalBudget > 0 ? Math.round((totalSpent / totalBudget) * 100) : 0;
 
-    const budgetUsedPercentage =
-      totalBudget > 0
-        ? Math.round((totalSpent / totalBudget) * 100)
-        : 0;
-
-    // 3️⃣ Get Tasks
     const { data: tasks, error: taskError } = await supabase
       .from("tasks")
       .select("status, deadline")
@@ -214,36 +235,41 @@ router.get("/:id/analytics", async (req, res) => {
 
     if (taskError) throw taskError;
 
-    const totalTasks = tasks.length;
-
-    const completedTasks = tasks.filter(
-      (t) => t.status === "completed"
-    ).length;
-
-    const completionPercentage =
-      totalTasks > 0
-        ? Math.round((completedTasks / totalTasks) * 100)
-        : 0;
+    const safeTasks = Array.isArray(tasks) ? tasks : [];
+    const totalTasks = safeTasks.length;
+    const completedTasks = safeTasks.filter((task) => task.status === "completed").length;
+    const completionPercentage = totalTasks > 0 ? Math.round((completedTasks / totalTasks) * 100) : 0;
 
     const today = new Date().toISOString().split("T")[0];
-
-    const overdueTasks = tasks.filter(
-      (t) =>
-        t.deadline &&
-        t.deadline < today &&
-        t.status !== "completed"
+    const overdueTasks = safeTasks.filter(
+      (task) => task.deadline && task.deadline < today && task.status !== "completed"
     ).length;
 
-    // 4️⃣ Health Logic
     let healthStatus = "healthy";
+    if (budgetUsedPercentage > 90) healthStatus = "budget_risk";
+    if (overdueTasks > 0) healthStatus = "delayed";
 
-    if (budgetUsedPercentage > 90) {
-      healthStatus = "budget_risk";
-    }
+    const taskStatusDistribution = ["pending", "in_progress", "completed"].map((status) => ({
+      status,
+      count: safeTasks.filter((task) => (task.status || "pending") === status).length,
+    }));
 
-    if (overdueTasks > 0) {
-      healthStatus = "delayed";
-    }
+    const groupedExpenses = safeExpenses.reduce((acc, expense) => {
+      const key = expense.category || "uncategorized";
+      acc[key] = (acc[key] || 0) + safeNumber(expense.amount);
+      return acc;
+    }, {});
+
+    const expenseBreakdown = Object.entries(groupedExpenses).map(([category, amount]) => ({
+      category,
+      amount,
+    }));
+
+    const budgetSeries = [
+      { label: "Budget", value: totalBudget },
+      { label: "Spent", value: totalSpent },
+      { label: "Remaining", value: Math.max(remainingBudget, 0) },
+    ];
 
     res.json({
       success: true,
@@ -257,6 +283,9 @@ router.get("/:id/analytics", async (req, res) => {
         completionPercentage,
         overdueTasks,
         healthStatus,
+        budgetSeries,
+        taskStatusDistribution,
+        expenseBreakdown,
       },
     });
   } catch (error) {

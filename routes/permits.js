@@ -72,7 +72,11 @@ router.patch("/:id", async (req, res) => {
 
     if (error) throw error;
 
-    res.json({ success: true, data });
+    if (!Array.isArray(data) || data.length === 0) {
+      return res.status(404).json({ success: false, message: "Permit not found" });
+    }
+
+    res.json({ success: true, data: data[0] });
   } catch (error) {
     res.status(500).json({ success: false, message: error.message });
   }
