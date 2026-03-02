@@ -68,12 +68,23 @@ router.post("/apply/:templateId/:projectId", async (req, res) => {
   try {
     const { templateId, projectId } = req.params;
 
-    const { data: templateTasks } = await supabase
+    const { data: templateTasks, error: templateTaskError } = await supabase
       .from("template_tasks")
       .select("*")
       .eq("template_id", templateId);
 
-    const formatted = templateTasks.map((task) => ({
+    if (templateTaskError) throw templateTaskError;
+
+    const safeTemplateTasks = Array.isArray(templateTasks) ? templateTasks : [];
+
+    if (safeTemplateTasks.length === 0) {
+      return res.status(200).json({
+        success: true,
+        message: "Template has no tasks to apply",
+      });
+    }
+
+    const formatted = safeTemplateTasks.map((task) => ({
       title: task.title,
       description: task.description,
       priority: task.priority,

@@ -49,6 +49,29 @@ function generateMaterialSeed(projectName) {
   ];
 }
 
+router.get("/:projectId", async (req, res) => {
+  try {
+    const { projectId } = req.params;
+
+    const { data, error } = await supabase
+      .from("materials")
+      .select("id, project_id, name, estimated_cost, created_at")
+      .eq("project_id", projectId)
+      .order("created_at", { ascending: false });
+
+    if (error) throw error;
+
+    res.json({ success: true, data: Array.isArray(data) ? data : [] });
+  } catch (error) {
+    console.error("[GET /api/materials/:projectId] Error:", error);
+    res.status(500).json({
+      success: false,
+      message: "Failed to fetch materials",
+      data: [],
+    });
+  }
+});
+
 router.post("/auto/:projectId", async (req, res) => {
   try {
     const { projectId } = req.params;
@@ -87,7 +110,12 @@ router.post("/auto/:projectId", async (req, res) => {
 
     res.json({ success: true, data: Array.isArray(inserted) ? inserted : [] });
   } catch (error) {
-    res.status(200).json({ success: true, data: [], message: error.message || "Unable to auto-generate materials" });
+    console.error("[POST /api/materials/auto/:projectId] Error:", error);
+    res.status(500).json({
+      success: false,
+      data: [],
+      message: "Unable to auto-generate materials",
+    });
   }
 });
 

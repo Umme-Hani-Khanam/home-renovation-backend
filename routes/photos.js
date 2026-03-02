@@ -105,11 +105,18 @@ router.get("/:projectId", async (req, res) => {
       .eq("project_id", projectId)
       .order("created_at", { ascending: false });
 
-    if (error) throw error;
+    if (error) {
+      console.error("[GET /api/photos/:projectId] Supabase error:", error);
+      return res.status(500).json({
+        success: false,
+        message: "Failed to fetch photos",
+      });
+    }
 
     res.json({ success: true, data: Array.isArray(data) ? data : [] });
   } catch (error) {
-    res.status(500).json({ success: false, message: error.message });
+    console.error("[GET /api/photos/:projectId] Unexpected error:", error);
+    res.status(500).json({ success: false, message: "Failed to fetch photos" });
   }
 });
 

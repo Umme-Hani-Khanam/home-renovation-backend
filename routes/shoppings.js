@@ -12,6 +12,13 @@ router.post("/", async (req, res) => {
   try {
     const { project_id, item_name, estimated_cost } = req.body;
 
+    if (!project_id || !item_name) {
+      return res.status(400).json({
+        success: false,
+        message: "project_id and item_name are required",
+      });
+    }
+
     const { data, error } = await supabase
       .from("shopping_list")
       .insert([
@@ -23,7 +30,8 @@ router.post("/", async (req, res) => {
 
     res.status(201).json({ success: true, data });
   } catch (err) {
-    res.status(500).json({ success: false });
+    console.error("[POST /api/shopping] Error:", err);
+    res.status(500).json({ success: false, message: "Failed to add shopping item" });
   }
 });
 
@@ -31,29 +39,43 @@ router.post("/", async (req, res) => {
  * GET ITEMS
  */
 router.get("/:projectId", async (req, res) => {
-  const { projectId } = req.params;
+  try {
+    const { projectId } = req.params;
 
-  const { data } = await supabase
-    .from("shopping_list")
-    .select("*")
-    .eq("project_id", projectId);
+    const { data, error } = await supabase
+      .from("shopping_list")
+      .select("*")
+      .eq("project_id", projectId);
 
-  res.json({ success: true, data });
+    if (error) throw error;
+
+    res.json({ success: true, data: Array.isArray(data) ? data : [] });
+  } catch (err) {
+    console.error("[GET /api/shopping/:projectId] Error:", err);
+    res.status(500).json({ success: false, message: "Failed to fetch shopping items", data: [] });
+  }
 });
 
 /**
  * MARK PURCHASED
  */
 router.patch("/:id", async (req, res) => {
-  const { id } = req.params;
-  const { purchased, actual_cost } = req.body;
+  try {
+    const { id } = req.params;
+    const { purchased, actual_cost } = req.body;
 
-  await supabase
-    .from("shopping_list")
-    .update({ purchased, actual_cost })
-    .eq("id", id);
+    const { error } = await supabase
+      .from("shopping_list")
+      .update({ purchased, actual_cost })
+      .eq("id", id);
 
-  res.json({ success: true });
+    if (error) throw error;
+
+    res.json({ success: true });
+  } catch (err) {
+    console.error("[PATCH /api/shopping/:id] Error:", err);
+    res.status(500).json({ success: false, message: "Failed to update shopping item" });
+  }
 });
 
 export default router;

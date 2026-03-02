@@ -8,7 +8,6 @@ import supabase from "./config/supabase.js";
 import contractorRoutes from "./routes/contractors.js";
 import inventoryRoutes from "./routes/inventory.js";
 import permitRoutes from "./routes/permits.js";
-import reminderRoutes from "./routes/reminders.js";
 import templateRoutes from "./routes/templates.js";
 import inspirationRoutes from "./routes/inspiration.js";
 import authRoutes from "./routes/auth.js";
@@ -61,7 +60,6 @@ app.use("/api/members", memberRoutes);
 
 app.use("/api/inventory", inventoryRoutes);
 app.use("/api/permits", permitRoutes);
-app.use("/api/reminders", reminderRoutes);
 app.use("/api/templates", templateRoutes);
 app.use("/api/inspiration", inspirationRoutes);
 const PORT = process.env.PORT || 5000;
