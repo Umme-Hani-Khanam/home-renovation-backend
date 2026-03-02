@@ -63,7 +63,10 @@ router.post("/", async (req, res) => {
         upsert: false,
       });
 
-    if (uploadError) throw uploadError;
+    if (uploadError) {
+      console.error("[POST /api/photos] Supabase storage upload error:", uploadError);
+      return res.status(500).json({ success: false, message: "Failed to upload photo file" });
+    }
 
     const { data: publicUrlData } = supabase.storage
       .from("project-photos")
@@ -76,6 +79,11 @@ router.post("/", async (req, res) => {
       imageUrl = `${baseUrl}/storage/v1/object/public/project-photos/${filePath}`;
     }
 
+    if (!imageUrl) {
+      console.error("[POST /api/photos] Missing public URL for uploaded photo", { filePath });
+      return res.status(500).json({ success: false, message: "Failed to generate photo URL" });
+    }
+
     const { data, error } = await supabase
       .from("project_photos")
       .insert([
@@ -86,11 +94,15 @@ router.post("/", async (req, res) => {
       ])
       .select();
 
-    if (error) throw error;
+    if (error) {
+      console.error("[POST /api/photos] Supabase insert error:", error);
+      return res.status(500).json({ success: false, message: "Failed to save photo record" });
+    }
 
     res.status(201).json({ success: true, data });
   } catch (error) {
-    res.status(500).json({ success: false, message: error.message });
+    console.error("[POST /api/photos] Unexpected error:", error);
+    res.status(500).json({ success: false, message: "Photo upload failed" });
   }
 });
 
