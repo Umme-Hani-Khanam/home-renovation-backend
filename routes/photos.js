@@ -4,9 +4,10 @@ import { authenticateUser } from "../middleware/auth.js";
 
 const router = express.Router();
 router.use(authenticateUser);
+const STORAGE_BUCKET = "project-photos";
 
 function parseDataUrl(base64Value) {
-  const raw = String(base64Value || "").trim();
+  const raw = String(base64Value || "").trim().replace(/\s+/g, "");
   const match = raw.match(/^data:(image\/[a-zA-Z0-9.+-]+);base64,(.+)$/);
 
   if (match) {
@@ -30,34 +31,51 @@ function extensionFromMime(mimeType) {
   return "png";
 }
 
+function isValidBase64Payload(value) {
+  if (!value || value.length % 4 !== 0) return false;
+  return /^[A-Za-z0-9+/]+={0,2}$/.test(value);
+}
+
 /* UPLOAD PHOTO */
 router.post("/", async (req, res) => {
   try {
-    const { project_id, image_base64, file_name } = req.body;
+    const projectId = String(req.body?.project_id || "").trim();
+    const imageBase64 = req.body?.image_base64;
+    const fileName = String(req.body?.file_name || "photo").trim();
 
-    if (!project_id || !image_base64) {
+    if (!projectId) {
       return res.status(400).json({
         success: false,
-        message: "Project and image required",
+        message: "project_id is required.",
       });
     }
 
-    const { mimeType, payload } = parseDataUrl(image_base64);
+    if (!imageBase64) {
+      return res.status(400).json({
+        success: false,
+        message: "image_base64 is required.",
+      });
+    }
 
-    if (!payload) {
-      return res.status(400).json({ success: false, message: "Invalid image payload" });
+    const { mimeType, payload } = parseDataUrl(imageBase64);
+
+    if (!payload || !isValidBase64Payload(payload)) {
+      return res.status(400).json({ success: false, message: "Invalid image_base64 payload." });
     }
 
     const buffer = Buffer.from(payload, "base64");
+    if (!buffer.length) {
+      return res.status(400).json({ success: false, message: "Invalid image_base64 payload." });
+    }
 
-    const safeInputName = String(file_name || "photo").replace(/[^a-zA-Z0-9._-]/g, "_");
+    const safeInputName = fileName.replace(/[^a-zA-Z0-9._-]/g, "_") || "photo";
     const hasExt = safeInputName.includes(".");
     const extension = extensionFromMime(mimeType);
     const resolvedName = hasExt ? safeInputName : `${safeInputName}.${extension}`;
-    const filePath = `${project_id}/${Date.now()}-${resolvedName}`;
+    const filePath = `${projectId}/${Date.now()}-${resolvedName}`;
 
     const { error: uploadError } = await supabase.storage
-      .from("project-photos")
+      .from(STORAGE_BUCKET)
       .upload(filePath, buffer, {
         contentType: mimeType,
         upsert: false,
@@ -69,14 +87,14 @@ router.post("/", async (req, res) => {
     }
 
     const { data: publicUrlData } = supabase.storage
-      .from("project-photos")
+      .from(STORAGE_BUCKET)
       .getPublicUrl(filePath);
 
     let imageUrl = publicUrlData?.publicUrl || "";
 
     if (imageUrl && !imageUrl.startsWith("http")) {
       const baseUrl = process.env.SUPABASE_URL || "";
-      imageUrl = `${baseUrl}/storage/v1/object/public/project-photos/${filePath}`;
+      imageUrl = `${baseUrl}/storage/v1/object/public/${STORAGE_BUCKET}/${filePath}`;
     }
 
     if (!imageUrl) {
@@ -88,14 +106,16 @@ router.post("/", async (req, res) => {
       .from("project_photos")
       .insert([
         {
-          project_id,
+          project_id: projectId,
           image_url: imageUrl,
         },
       ])
-      .select();
+      .select()
+      .single();
 
     if (error) {
       console.error("[POST /api/photos] Supabase insert error:", error);
+      await supabase.storage.from(STORAGE_BUCKET).remove([filePath]);
       return res.status(500).json({ success: false, message: "Failed to save photo record" });
     }
 
