@@ -9,26 +9,20 @@ const normalizeString = (value) =>
 // SIGNUP
 router.post("/signup", async (req, res) => {
   try {
-    const name = normalizeString(req.body?.name);
     const email = normalizeString(req.body?.email).toLowerCase();
     const password =
       typeof req.body?.password === "string" ? req.body.password : "";
 
-    if (!name || !email || !password) {
+    if (!email || !password) {
       return res.status(400).json({
         success: false,
-        message: "Name, email, and password are required.",
+        message: "Email and password are required.",
       });
     }
 
     const { data, error } = await supabase.auth.signUp({
       email,
       password,
-      options: {
-        data: {
-          name,
-        },
-      },
     });
 
     if (error) {
@@ -45,7 +39,7 @@ router.post("/signup", async (req, res) => {
         ? {
             id: data.user.id,
             email: data.user.email,
-            name: data.user.user_metadata?.name || name,
+            created_at: data.user.created_at,
           }
         : null,
     });
@@ -96,7 +90,7 @@ router.post("/login", async (req, res) => {
       user: {
         id: data.user.id,
         email: data.user.email,
-        name: data.user.user_metadata?.name || "",
+        created_at: data.user.created_at,
       },
     });
   } catch (err) {
