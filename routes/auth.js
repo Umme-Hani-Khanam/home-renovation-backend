@@ -32,6 +32,24 @@ router.post("/signup", async (req, res) => {
       });
     }
 
+    if (!data?.user?.id) {
+      return res.status(500).json({
+        success: false,
+        message: "Signup succeeded but no user was returned.",
+      });
+    }
+
+    const { error: profileError } = await supabase
+      .from("profiles")
+      .insert([{ id: data.user.id }]);
+
+    if (profileError) {
+      return res.status(500).json({
+        success: false,
+        message: "User created, but profile creation failed.",
+      });
+    }
+
     return res.status(201).json({
       success: true,
       message: "Signup successful.",
